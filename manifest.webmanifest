@@ -1,0 +1,17 @@
+{
+  "name": "DoneLog — Home Chore & Proof Tracker",
+  "short_name": "DoneLog",
+  "description": "Log what you did, when you did it, and attach photo proof — synced free across PC and phone with GitHub Gist.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f8fa",
+  "theme_color": "#0d9488",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

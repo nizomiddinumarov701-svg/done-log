@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>DoneLog — Home Chore &amp; Proof Tracker</title>
+  <meta name="description" content="Log what you did, when you did it, and attach photo proof to show your brother — free PC &amp; Phone cloud sync via GitHub Gist." />
+  <meta name="theme-color" content="#0d9488" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="DoneLog" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">✓</div>
+        <div>
+          <div class="brand-row">
+            <h1 class="brand-title">DoneLog</h1>
+            <span class="sync-pill" id="syncPill" title="Cloud sync status">Local mode</span>
+          </div>
+          <p class="brand-subtitle">Track what you did &amp; when</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button type="button" id="btnSync" class="btn btn-primary" title="Free GitHub PC ↔ Phone Cloud Sync">
+          <span>☁️</span>
+          <span class="btn-label" id="btnSyncLabel">Sync</span>
+        </button>
+        <button type="button" id="btnShareBrother" class="btn btn-ghost hidden" title="Copy read-only link for your brother">
+          <span>👁️</span>
+          <span class="btn-label">Share View</span>
+        </button>
+        <button type="button" id="btnCopySummary" class="btn btn-ghost" title="Copy a clean text summary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span class="btn-label">Copy List</span>
+        </button>
+        <button type="button" id="btnBackup" class="btn btn-ghost" title="Export or restore backup">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="btn-label">Backup</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Summary Stats Bar -->
+    <section class="stats-grid" aria-label="Summary statistics">
+      <div class="stat-card stat-highlight">
+        <span class="stat-label">Done Today</span>
+        <strong class="stat-value" id="statToday">0</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">This Week</span>
+        <strong class="stat-value" id="statWeek">0</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Total Logged</span>
+        <strong class="stat-value" id="statTotal">0</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Photo Proofs</span>
+        <strong class="stat-value" id="statPhotos">0</strong>
+      </div>
+    </section>
+
+    <!-- Main Two-Column Layout -->
+    <main class="main-grid">
+      <!-- Left Column: Brother Read-Only View Card OR Log Composer -->
+      <aside class="composer-panel">
+        <!-- Read-Only Share View Card (when opened with ?view=<gistId>) -->
+        <div id="viewerCard" class="card locked-card hidden">
+          <div class="locked-badge">👁️ View-Only Proof Mode</div>
+          <h2>Verified Chore History</h2>
+          <p class="locked-desc">
+            You're viewing a live read-only chore log with timestamps and photo proofs. Tap any photo to inspect it full-screen.
+          </p>
+          <button type="button" id="btnRefreshView" class="btn btn-primary btn-full">
+            🔄 Refresh Latest
+          </button>
+          <a id="btnExitView" href="./" class="btn btn-ghost btn-full">
+            Open My Own DoneLog →
+          </a>
+        </div>
+
+        <!-- Composer Card (Owner Mode) -->
+        <div id="composerCard" class="card composer-card">
+          <div class="card-header">
+            <h2>Log What You Did</h2>
+            <span class="live-clock" id="liveClock">Now</span>
+          </div>
+
+          <!-- Quick-Pick Presets -->
+          <div class="presets-section">
+            <div class="presets-header">
+              <span class="field-label">Quick pick</span>
+              <button type="button" id="btnManagePresets" class="link-btn">Edit list</button>
+            </div>
+            <div class="presets-chips" id="presetChips" role="list"></div>
+          </div>
+
+          <form id="logForm" class="log-form" novalidate>
+            <div class="field">
+              <label for="taskInput" class="field-label">Task / Chore <span class="required">*</span></label>
+              <input
+                type="text"
+                id="taskInput"
+                class="input"
+                placeholder="e.g., Washed all the dishes"
+                maxlength="120"
+                required
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="field">
+              <label for="noteInput" class="field-label">Details / Note <span class="optional">(optional)</span></label>
+              <textarea
+                id="noteInput"
+                class="input textarea"
+                rows="2"
+                placeholder="e.g., Also wiped the stove and put dishes away"
+                maxlength="300"
+              ></textarea>
+            </div>
+
+            <!-- Timestamp Row -->
+            <div class="field">
+              <div class="time-row">
+                <span class="field-label">When did you do it?</span>
+                <label class="toggle-inline">
+                  <input type="checkbox" id="customTimeToggle" />
+                  <span>Set custom time</span>
+                </label>
+              </div>
+              <div id="customTimeWrap" class="custom-time-wrap hidden">
+                <input type="datetime-local" id="customTimeInput" class="input" />
+              </div>
+              <p id="autoTimeHint" class="field-hint">Automatically saves the exact current date &amp; time.</p>
+            </div>
+
+            <!-- Photo Proof Upload -->
+            <div class="field">
+              <span class="field-label">Photo Proof <span class="optional">(optional)</span></span>
+              <div id="photoDropzone" class="photo-dropzone" tabindex="0" role="button" aria-label="Add photo proof">
+                <input type="file" id="photoInput" accept="image/*" hidden />
+                <div class="dropzone-empty" id="dropzoneEmpty">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <span class="dropzone-title">Add a photo as proof</span>
+                  <span class="dropzone-sub">Tap to take a photo, choose from gallery, or drop here</span>
+                </div>
+                <div class="dropzone-preview hidden" id="dropzonePreview">
+                  <img id="photoPreviewImg" alt="Selected proof preview" />
+                  <button type="button" id="btnRemovePhoto" class="btn-icon-remove" aria-label="Remove photo" title="Remove photo">×</button>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="btnSubmitLog">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span id="btnSubmitLabel">Mark as Done</span>
+            </button>
+          </form>
+        </div>
+      </aside>
+
+      <!-- Right Column: Timeline / History -->
+      <section class="history-panel" aria-label="Completed tasks history">
+        <div class="history-controls card">
+          <div class="filter-tabs" role="tablist" aria-label="Filter by date">
+            <button type="button" class="filter-tab active" data-range="all" role="tab" aria-selected="true">All</button>
+            <button type="button" class="filter-tab" data-range="today" role="tab" aria-selected="false">Today</button>
+            <button type="button" class="filter-tab" data-range="week" role="tab" aria-selected="false">This Week</button>
+            <button type="button" class="filter-tab" data-range="month" role="tab" aria-selected="false">This Month</button>
+          </div>
+
+          <div class="search-row">
+            <div class="search-box">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="searchInput" class="input search-input" placeholder="Search what you did..." />
+            </div>
+            <label class="photo-filter-pill">
+              <input type="checkbox" id="photoOnlyToggle" />
+              <span>📷 With photo</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="empty-state card hidden">
+          <div class="spinner" aria-hidden="true"></div>
+          <h3>Loading chore log...</h3>
+          <p>Fetching saved chores and photo proofs from GitHub Gist.</p>
+        </div>
+
+        <!-- Timeline Feed -->
+        <div id="timelineContainer" class="timeline-container"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state card hidden">
+          <div class="empty-icon" aria-hidden="true">📋</div>
+          <h3 id="emptyTitle">Nothing logged yet</h3>
+          <p id="emptyMessage">Log your first completed chore on the left — and connect free GitHub Sync to keep it backed up across your PC and phone forever.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- GitHub Gist Cloud Sync Modal -->
+  <div id="syncModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="syncModalTitle">
+    <div class="modal-backdrop" data-close-modal="syncModal"></div>
+    <div class="modal-card modal-wide">
+      <div class="modal-header">
+        <h3 id="syncModalTitle">☁️ Free GitHub PC ↔ Phone Sync</h3>
+        <button type="button" class="modal-close" data-close-modal="syncModal" aria-label="Close">×</button>
+      </div>
+
+      <!-- Connected View -->
+      <div id="syncConnectedPanel" class="sync-panel hidden">
+        <div class="sync-status-box">
+          <div class="sync-status-row">
+            <span class="sync-dot connected"></span>
+            <div>
+              <strong id="syncConnectedUser">Connected</strong>
+              <div class="sync-status-sub" id="syncLastTime">Synced just now</div>
+            </div>
+          </div>
+          <div class="sync-meta-links">
+            <button type="button" id="btnCopyTokenPhone" class="btn btn-secondary btn-sm">📋 Copy Token for Phone</button>
+            <button type="button" id="btnCopyBrotherLink" class="btn btn-secondary btn-sm">👁️ Copy Brother's View Link</button>
+            <a id="syncGistLink" class="btn btn-ghost btn-sm" href="#" target="_blank" rel="noopener noreferrer">Private Gist ↗</a>
+          </div>
+        </div>
+
+        <p id="syncConnectedError" class="form-error hidden" role="alert"></p>
+
+        <div class="sync-instructions">
+          <strong>To connect your phone:</strong>
+          <p>Open this same DoneLog link on your phone, tap <strong>☁️ Sync</strong>, and paste your <strong>same GitHub Sync Token</strong> — your private vault and photos sync automatically!</p>
+          <strong>To show your brother (read-only):</strong>
+          <p>Tap <strong>👁️ Copy Brother's View Link</strong> above and send it to him. He can see all chores, times, and photo proofs without logging in — and cannot edit or delete anything.</p>
+        </div>
+
+        <div class="modal-actions modal-actions-split">
+          <button type="button" id="btnSyncDisconnect" class="btn btn-danger-soft">Sign Out on This Device</button>
+          <button type="button" id="btnSyncNow" class="btn btn-primary">🔄 Sync Now</button>
+        </div>
+      </div>
+
+      <!-- Setup View -->
+      <div id="syncSetupPanel" class="sync-panel">
+        <p class="modal-desc">
+          Sync your chores, timestamps, presets, and photo proofs across PC and phone using a <strong>private GitHub Gist</strong> — 100% free forever with zero credit limits!
+        </p>
+
+        <div class="sync-steps">
+          <div class="sync-step">
+            <span class="sync-step-num">1</span>
+            <div class="sync-step-body">
+              <div><strong>Use your existing LifeQuest <code>gist</code> token</strong> or create a free GitHub Sync Token (only checks <code>gist</code>):</div>
+              <a id="createTokenLink" class="btn btn-secondary btn-sm sync-token-link-btn" href="https://github.com/settings/tokens/new?scopes=gist&description=DoneLog+Sync" target="_blank" rel="noopener noreferrer">
+                🔑 Create GitHub Token ↗
+              </a>
+              <span class="sync-step-hint">Set Expiration to <strong>No expiration</strong> (or 1 year), click <strong>Generate token</strong>, and copy the <code>ghp_...</code> code. DoneLog creates its own separate vault file so it never affects LifeQuest.</span>
+            </div>
+          </div>
+          <div class="sync-step">
+            <span class="sync-step-num">2</span>
+            <div class="sync-step-body">
+              <strong>Paste it below on PC &amp; Phone</strong>
+              <span class="sync-step-hint">First device creates your private vault; your second device auto-finds and syncs everything with the same token!</span>
+            </div>
+          </div>
+        </div>
+
+        <p id="syncSetupError" class="form-error hidden" role="alert"></p>
+
+        <form id="syncConnectForm" class="log-form">
+          <div class="field">
+            <label for="syncTokenInput" class="field-label">GitHub Sync Token <span class="optional">(<code>gist</code> scope)</span></label>
+            <input
+              type="password"
+              id="syncTokenInput"
+              class="input"
+              required
+              minlength="10"
+              maxlength="200"
+              placeholder="Paste ghp_... or github_pat_..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+
+          <p class="field-hint">🔒 Stored only inside this browser and talks directly to GitHub's official API.</p>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" data-close-modal="syncModal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btnSyncConnect">☁️ Connect &amp; Sync Now</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Proof Lightbox Modal -->
+  <div id="lightboxModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
+    <div class="modal-backdrop" data-close-modal="lightboxModal"></div>
+    <div class="lightbox-content">
+      <button type="button" class="lightbox-close" data-close-modal="lightboxModal" aria-label="Close photo">×</button>
+      <img id="lightboxImg" src="" alt="Task proof photo" />
+      <div class="lightbox-caption">
+        <div>
+          <h3 id="lightboxTitle"></h3>
+          <p id="lightboxMeta"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Entry Modal -->
+  <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="modal-backdrop" data-close-modal="editModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="editModalTitle">Edit Entry</h3>
+        <button type="button" class="modal-close" data-close-modal="editModal" aria-label="Close">×</button>
+      </div>
+      <form id="editForm" class="log-form">
+        <input type="hidden" id="editId" />
+        <div class="field">
+          <label for="editTaskInput" class="field-label">Task / Chore</label>
+          <input type="text" id="editTaskInput" class="input" maxlength="120" required />
+        </div>
+        <div class="field">
+          <label for="editNoteInput" class="field-label">Details / Note</label>
+          <textarea id="editNoteInput" class="input textarea" rows="2" maxlength="300"></textarea>
+        </div>
+        <div class="field">
+          <label for="editTimeInput" class="field-label">Date &amp; Time</label>
+          <input type="datetime-local" id="editTimeInput" class="input" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="editModal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveEdit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manage Quick Presets Modal -->
+  <div id="presetsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="presetsModalTitle">
+    <div class="modal-backdrop" data-close-modal="presetsModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="presetsModalTitle">Quick-Pick Chores</h3>
+        <button type="button" class="modal-close" data-close-modal="presetsModal" aria-label="Close">×</button>
+      </div>
+      <form id="addPresetForm" class="preset-add-row">
+        <input type="text" id="newPresetIcon" class="input icon-input" value="✅" maxlength="4" aria-label="Emoji icon" />
+        <input type="text" id="newPresetLabel" class="input" placeholder="Add new chore (e.g., Watered plants)" maxlength="50" required />
+        <button type="submit" class="btn btn-primary">Add</button>
+      </form>
+      <ul id="presetManageList" class="preset-manage-list"></ul>
+      <div class="modal-actions">
+        <button type="button" id="btnResetPresets" class="btn btn-ghost">Reset defaults</button>
+        <button type="button" class="btn btn-primary" data-close-modal="presetsModal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup / Export Modal -->
+  <div id="backupModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="backupModalTitle">
+    <div class="modal-backdrop" data-close-modal="backupModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="backupModalTitle">Backup &amp; Restore</h3>
+        <button type="button" class="modal-close" data-close-modal="backupModal" aria-label="Close">×</button>
+      </div>
+      <p class="modal-desc">Download a full JSON backup of all your chores and photo proofs, or restore one anytime.</p>
+      <div class="backup-actions">
+        <button type="button" id="btnExportJson" class="btn btn-primary btn-full">Download Backup (.json)</button>
+        <label id="restoreBackupLabel" class="btn btn-secondary btn-full file-btn">
+          <span>Restore from Backup (.json)</span>
+          <input type="file" id="importJsonInput" accept="application/json,.json" hidden />
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
