@@ -1,11 +1,10 @@
 /**
  * DoneLog Free GitHub Gist PC ↔ Phone Cloud Sync + Read-Only Share View loader.
- * Stores chore metadata in `donelog-sync-vault.json` and each photo proof as its
- * own sibling file (`photo_<id>.txt`) inside the same private GitHub Gist so
- * incremental updates stay fast and lightweight.
+ * Stores chore metadata, turn info, and member names in `donelog-sync-vault.json`,
+ * and each Before/After photo proof as its own sibling file inside the same private Gist.
  */
 
-import { DEFAULT_PRESETS } from './db.js';
+import { DEFAULT_MEMBERS, DEFAULT_PRESETS } from './db.js';
 
 const GITHUB_API = 'https://api.github.com';
 export const GIST_FILENAME = 'donelog-sync-vault.json';
@@ -13,11 +12,11 @@ export const GIST_DESCRIPTION = 'DoneLog Chore & Proof Vault (Private — Do not
 export const GITHUB_TOKEN_CREATE_URL =
   'https://github.com/settings/tokens/new?scopes=gist&description=DoneLog+Sync';
 
-const PHOTO_FILE_PATTERN = /^photo_[a-zA-Z0-9_-]+\.txt$/;
+const PHOTO_FILE_PATTERN = /^photo_(?:before_)?[a-zA-Z0-9_-]+\.txt$/;
 
-export function makePhotoFileName(entryId) {
+export function makePhotoFileName(entryId, slot = 'after') {
   const safe = String(entryId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48) || Date.now();
-  return `photo_${safe}.txt`;
+  return slot === 'before' ? `photo_before_${safe}.txt` : `photo_${safe}.txt`;
 }
 
 export function sanitizeEntries(rawEntries = []) {
@@ -31,11 +30,16 @@ export function sanitizeEntries(rawEntries = []) {
       title: String(raw.title).trim().slice(0, 120),
       note: String(raw.note || '').trim().slice(0, 300),
       icon: String(raw.icon || '✅').trim().slice(0, 8) || '✅',
+      doneBy: raw.doneBy === 'brother' ? 'brother' : 'me',
       timestamp: ts,
       updatedAt: Number(raw.updatedAt || ts) || ts,
       photoFile:
         typeof raw.photoFile === 'string' && PHOTO_FILE_PATTERN.test(raw.photoFile)
           ? raw.photoFile
+          : null,
+      beforePhotoFile:
+        typeof raw.beforePhotoFile === 'string' && PHOTO_FILE_PATTERN.test(raw.beforePhotoFile)
+          ? raw.beforePhotoFile
           : null
     });
   }
@@ -56,11 +60,19 @@ export function sanitizePresets(rawPresets) {
   return cleaned.length > 0 ? cleaned : [...DEFAULT_PRESETS];
 }
 
+export function sanitizeMembers(rawMembers) {
+  if (!rawMembers || typeof rawMembers !== 'object') return { ...DEFAULT_MEMBERS };
+  return {
+    me: String(rawMembers.me || '').trim().slice(0, 24),
+    brother: String(rawMembers.brother || '').trim().slice(0, 24)
+  };
+}
+
 /**
  * Deterministic merge across PC and Phone:
  * - Honors deletion tombstones so deleted chores stay deleted.
  * - Keeps newer updatedAt if edited on either device.
- * - Preserves photos from both local and remote caches for surviving entries.
+ * - Preserves Before & After photos from both local and remote caches for surviving entries.
  */
 export function mergeVaultStates(local, remote) {
   const deletedIds = { ...(remote.deletedIds || {}) };
@@ -83,8 +95,13 @@ export function mergeVaultStates(local, remote) {
 
   const entries = Array.from(entryMap.values()).sort((a, b) => b.timestamp - a.timestamp);
 
-  // Merge photos only for surviving entries
-  const neededPhotoFiles = new Set(entries.map((e) => e.photoFile).filter(Boolean));
+  // Merge photos only for surviving entries (both After & Before slots)
+  const neededPhotoFiles = new Set();
+  for (const e of entries) {
+    if (e.photoFile) neededPhotoFiles.add(e.photoFile);
+    if (e.beforePhotoFile) neededPhotoFiles.add(e.beforePhotoFile);
+  }
+
   const photos = new Map();
   if (remote.photos instanceof Map) {
     for (const [k, v] of remote.photos.entries()) {
@@ -101,24 +118,40 @@ export function mergeVaultStates(local, remote) {
   const remotePresetTs = Number(remote.presetsUpdatedAt) || 0;
   const useRemotePresets = remotePresetTs > localPresetTs;
 
+  const localMemberTs = Number(local.membersUpdatedAt) || 0;
+  const remoteMemberTs = Number(remote.membersUpdatedAt) || 0;
+  const useRemoteMembers = remoteMemberTs > localMemberTs;
+
   return {
     entries,
     photos,
     presets: useRemotePresets ? sanitizePresets(remote.presets) : sanitizePresets(local.presets),
     presetsUpdatedAt: Math.max(localPresetTs, remotePresetTs),
+    members: useRemoteMembers ? sanitizeMembers(remote.members) : sanitizeMembers(local.members),
+    membersUpdatedAt: Math.max(localMemberTs, remoteMemberTs),
     deletedIds
   };
 }
 
-export function buildVaultJson({ version = 1, entries, presets, presetsUpdatedAt, deletedIds }) {
+export function buildVaultJson({
+  version = 1,
+  entries,
+  presets,
+  presetsUpdatedAt,
+  members,
+  membersUpdatedAt,
+  deletedIds
+}) {
   return JSON.stringify(
     {
       app: 'DoneLog',
-      schemaVersion: 1,
+      schemaVersion: 2,
       version: Math.max(1, Number(version) || 1),
       updatedAt: Date.now(),
       presetsUpdatedAt: Number(presetsUpdatedAt) || 0,
       presets: sanitizePresets(presets),
+      membersUpdatedAt: Number(membersUpdatedAt) || 0,
+      members: sanitizeMembers(members),
       deletedIds: deletedIds || {},
       entries: sanitizeEntries(entries)
     },
@@ -128,7 +161,6 @@ export function buildVaultJson({ version = 1, entries, presets, presetsUpdatedAt
 }
 
 async function fetchRawFileText(rawUrl) {
-  // Plain GET without Authorization header so gist.githubusercontent.com CORS succeeds cleanly
   const res = await fetch(rawUrl, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`Could not download full file from GitHub (${res.status}).`);
@@ -158,10 +190,11 @@ async function hydrateGist(gistObj) {
   const entries = sanitizeEntries(parsed.entries);
   const presets = sanitizePresets(parsed.presets);
   const presetsUpdatedAt = Number(parsed.presetsUpdatedAt) || 0;
+  const members = sanitizeMembers(parsed.members);
+  const membersUpdatedAt = Number(parsed.membersUpdatedAt) || 0;
   const deletedIds =
     parsed.deletedIds && typeof parsed.deletedIds === 'object' ? parsed.deletedIds : {};
 
-  // Track which photo files currently exist on the remote Gist
   const remotePhotoFiles = new Set();
   const photos = new Map();
 
@@ -192,6 +225,8 @@ async function hydrateGist(gistObj) {
     photos,
     presets,
     presetsUpdatedAt,
+    members,
+    membersUpdatedAt,
     deletedIds,
     remotePhotoFiles,
     gistUrl: gistObj.html_url || `https://gist.github.com/${gistObj.id}`
@@ -263,12 +298,6 @@ async function githubFetch(path, token, { method = 'GET', body = null } = {}) {
   return data;
 }
 
-/**
- * Connect with a GitHub token:
- * 1. Verify token & fetch username.
- * 2. Auto-discover an existing private DoneLog Gist (seamless 2nd-device phone connect!).
- * 3. If none exists yet, create a brand-new private Gist seeded with local entries & photos.
- */
 export async function apiGistConnect({ token, localVault }) {
   const cleanToken = String(token || '').trim();
   if (!cleanToken) throw new Error('Please paste your GitHub Sync Token first.');
@@ -290,7 +319,6 @@ export async function apiGistConnect({ token, localVault }) {
     };
   }
 
-  // First device: create private Gist with local entries & photos
   const files = {
     [GIST_FILENAME]: {
       content: buildVaultJson({
@@ -298,6 +326,8 @@ export async function apiGistConnect({ token, localVault }) {
         entries: localVault.entries,
         presets: localVault.presets,
         presetsUpdatedAt: localVault.presetsUpdatedAt,
+        members: localVault.members,
+        membersUpdatedAt: localVault.membersUpdatedAt,
         deletedIds: localVault.deletedIds
       })
     }
@@ -305,9 +335,11 @@ export async function apiGistConnect({ token, localVault }) {
 
   const remotePhotoFiles = new Set();
   for (const entry of localVault.entries) {
-    if (entry.photoFile && localVault.photos.has(entry.photoFile)) {
-      files[entry.photoFile] = { content: localVault.photos.get(entry.photoFile) };
-      remotePhotoFiles.add(entry.photoFile);
+    for (const key of [entry.photoFile, entry.beforePhotoFile]) {
+      if (key && localVault.photos.has(key)) {
+        files[key] = { content: localVault.photos.get(key) };
+        remotePhotoFiles.add(key);
+      }
     }
   }
 
@@ -330,6 +362,8 @@ export async function apiGistConnect({ token, localVault }) {
     photos: new Map(localVault.photos),
     presets: sanitizePresets(localVault.presets),
     presetsUpdatedAt: Number(localVault.presetsUpdatedAt) || 0,
+    members: sanitizeMembers(localVault.members),
+    membersUpdatedAt: Number(localVault.membersUpdatedAt) || 0,
     deletedIds: { ...(localVault.deletedIds || {}) },
     remotePhotoFiles
   };
@@ -340,9 +374,6 @@ export async function apiGistPull({ token, gistId }) {
   return hydrateGist(fullGist);
 }
 
-/**
- * Push merged vault + ONLY newly added / removed photo files to the private Gist.
- */
 export async function apiGistPush({ token, gistId, version, vault, remotePhotoFiles = new Set() }) {
   const nextVersion = Math.max(1, Number(version) || 1);
   const files = {
@@ -352,6 +383,8 @@ export async function apiGistPush({ token, gistId, version, vault, remotePhotoFi
         entries: vault.entries,
         presets: vault.presets,
         presetsUpdatedAt: vault.presetsUpdatedAt,
+        members: vault.members,
+        membersUpdatedAt: vault.membersUpdatedAt,
         deletedIds: vault.deletedIds
       })
     }
@@ -359,14 +392,15 @@ export async function apiGistPush({ token, gistId, version, vault, remotePhotoFi
 
   const activePhotoFiles = new Set();
   for (const entry of vault.entries) {
-    if (!entry.photoFile) continue;
-    activePhotoFiles.add(entry.photoFile);
-    if (!remotePhotoFiles.has(entry.photoFile) && vault.photos.has(entry.photoFile)) {
-      files[entry.photoFile] = { content: vault.photos.get(entry.photoFile) };
+    for (const key of [entry.photoFile, entry.beforePhotoFile]) {
+      if (!key) continue;
+      activePhotoFiles.add(key);
+      if (!remotePhotoFiles.has(key) && vault.photos.has(key)) {
+        files[key] = { content: vault.photos.get(key) };
+      }
     }
   }
 
-  // Delete orphaned photos from the Gist
   for (const oldFile of remotePhotoFiles) {
     if (!activePhotoFiles.has(oldFile)) {
       files[oldFile] = null;
@@ -397,9 +431,6 @@ export async function apiGistPush({ token, gistId, version, vault, remotePhotoFi
   };
 }
 
-/**
- * Unauthenticated read-only fetch for Brother's View Link (?view=<gistId>).
- */
 export async function apiGistReadPublicView(gistId) {
   const cleanId = String(gistId || '').trim();
   if (!/^[a-f0-9]{16,64}$/i.test(cleanId)) {

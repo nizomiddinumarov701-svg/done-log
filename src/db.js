@@ -1,6 +1,6 @@
 /**
- * Local IndexedDB storage for DoneLog entries, photos, presets, and deletion tombstones,
- * plus client-side image compression.
+ * Local IndexedDB storage for DoneLog entries (with turns & Before/After photos),
+ * member names, presets, deletion tombstones, preferences, and image compression/watermarking.
  */
 
 const DB_NAME = 'DoneLogVaultDB';
@@ -9,6 +9,8 @@ const STORE_ENTRIES = 'entries';
 const STORE_PHOTOS = 'photos';
 const STORE_META = 'meta';
 const SYNC_CONFIG_KEY = 'donelog_github_sync_v1';
+const THEME_KEY = 'donelog_theme_v1';
+const STAMP_PREF_KEY = 'donelog_stamp_v1';
 
 export const DEFAULT_PRESETS = [
   { id: 'dishes', icon: '🍽️', label: 'Washed dishes' },
@@ -21,6 +23,8 @@ export const DEFAULT_PRESETS = [
   { id: 'kitchen', icon: '🧽', label: 'Cleaned kitchen' },
   { id: 'bedroom', icon: '🛏️', label: 'Cleaned bedroom' }
 ];
+
+export const DEFAULT_MEMBERS = { me: '', brother: '' };
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -43,6 +47,15 @@ function openDB() {
   });
 }
 
+function readAll(db, storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function loadLocalVault() {
   try {
     const db = await openDB();
@@ -55,6 +68,7 @@ export async function loadLocalVault() {
     const meta = new Map(metaRows.map((r) => [r.key, r]));
     const presetsMeta = meta.get('presets');
     const deletedMeta = meta.get('deletedIds');
+    const membersMeta = meta.get('members');
 
     const photosMap = new Map();
     for (const row of photoRows) {
@@ -69,19 +83,32 @@ export async function loadLocalVault() {
         title: String(e.title || ''),
         note: String(e.note || ''),
         icon: String(e.icon || '✅'),
+        doneBy: e.doneBy === 'brother' ? 'brother' : 'me',
         timestamp: Number(e.timestamp) || Date.now(),
         updatedAt: Number(e.updatedAt || e.timestamp) || Date.now(),
-        photoFile: e.photoFile ? String(e.photoFile) : null
+        photoFile: e.photoFile ? String(e.photoFile) : null,
+        beforePhotoFile: e.beforePhotoFile ? String(e.beforePhotoFile) : null
       }))
       .sort((a, b) => b.timestamp - a.timestamp);
+
+    const members =
+      membersMeta?.value && typeof membersMeta.value === 'object'
+        ? {
+            me: String(membersMeta.value.me || '').trim().slice(0, 24),
+            brother: String(membersMeta.value.brother || '').trim().slice(0, 24)
+          }
+        : { ...DEFAULT_MEMBERS };
 
     return {
       entries: sortedEntries,
       photos: photosMap,
-      presets: Array.isArray(presetsMeta?.value) && presetsMeta.value.length > 0
-        ? presetsMeta.value
-        : [...DEFAULT_PRESETS],
+      presets:
+        Array.isArray(presetsMeta?.value) && presetsMeta.value.length > 0
+          ? presetsMeta.value
+          : [...DEFAULT_PRESETS],
       presetsUpdatedAt: Number(presetsMeta?.updatedAt) || 0,
+      members,
+      membersUpdatedAt: Number(membersMeta?.updatedAt) || 0,
       deletedIds: deletedMeta?.value && typeof deletedMeta.value === 'object' ? deletedMeta.value : {}
     };
   } catch (err) {
@@ -91,21 +118,22 @@ export async function loadLocalVault() {
       photos: new Map(),
       presets: [...DEFAULT_PRESETS],
       presetsUpdatedAt: 0,
+      members: { ...DEFAULT_MEMBERS },
+      membersUpdatedAt: 0,
       deletedIds: {}
     };
   }
 }
 
-function readAll(db, storeName) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const req = tx.objectStore(storeName).getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function saveLocalVault({ entries, photos, presets, presetsUpdatedAt, deletedIds }) {
+export async function saveLocalVault({
+  entries,
+  photos,
+  presets,
+  presetsUpdatedAt,
+  members,
+  membersUpdatedAt,
+  deletedIds
+}) {
   try {
     const db = await openDB();
     return await new Promise((resolve, reject) => {
@@ -121,9 +149,11 @@ export async function saveLocalVault({ entries, photos, presets, presetsUpdatedA
           title: e.title,
           note: e.note || '',
           icon: e.icon || '✅',
+          doneBy: e.doneBy === 'brother' ? 'brother' : 'me',
           timestamp: Number(e.timestamp) || Date.now(),
           updatedAt: Number(e.updatedAt || e.timestamp) || Date.now(),
-          photoFile: e.photoFile || null
+          photoFile: e.photoFile || null,
+          beforePhotoFile: e.beforePhotoFile || null
         });
       }
 
@@ -135,6 +165,11 @@ export async function saveLocalVault({ entries, photos, presets, presetsUpdatedA
       }
 
       metaStore.put({ key: 'presets', value: presets, updatedAt: Number(presetsUpdatedAt) || 0 });
+      metaStore.put({
+        key: 'members',
+        value: members || { ...DEFAULT_MEMBERS },
+        updatedAt: Number(membersUpdatedAt) || 0
+      });
       metaStore.put({ key: 'deletedIds', value: deletedIds || {} });
 
       tx.oncomplete = () => resolve();
@@ -176,11 +211,48 @@ export function saveSyncConfig(config) {
   }
 }
 
+export function loadSavedTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+  } catch {
+    // ignore
+  }
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+export function saveTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // ignore
+  }
+}
+
+export function loadStampPref() {
+  try {
+    const saved = localStorage.getItem(STAMP_PREF_KEY);
+    if (saved === 'false') return false;
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+export function saveStampPref(enabled) {
+  try {
+    localStorage.setItem(STAMP_PREF_KEY, enabled ? 'true' : 'false');
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Compresses an uploaded image file to a crisp, lightweight JPEG data URL
- * so photos upload quickly to GitHub Gist and fit comfortably under inline limits.
+ * Compresses an uploaded image file to a lightweight JPEG data URL.
  */
-export function compressImage(file, maxDimension = 1024, quality = 0.76) {
+export function compressImage(file, maxDimension = 1024, quality = 0.78) {
   return new Promise((resolve, reject) => {
     if (!file || !file.type.startsWith('image/')) {
       reject(new Error('Please select a valid image file.'));
@@ -214,5 +286,97 @@ export function compressImage(file, maxDimension = 1024, quality = 0.76) {
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+/**
+ * Renders a crisp, camera-style timestamp watermark onto a compressed image data URL
+ * (plus an optional top-left BEFORE/AFTER badge).
+ */
+export function applyTimestampWatermark(
+  cleanDataUrl,
+  { timestamp = Date.now(), tag = '', locale = undefined, quality = 0.78 } = {}
+) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error('Could not apply timestamp watermark.'));
+    img.onload = () => {
+      const { width, height } = img;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const minDim = Math.min(width, height);
+      const fontSize = Math.max(13, Math.min(26, Math.round(minDim * 0.032)));
+      const padX = Math.round(fontSize * 0.75);
+      const padY = Math.round(fontSize * 0.44);
+      const margin = Math.max(10, Math.round(minDim * 0.025));
+
+      const formattedDate = new Date(timestamp).toLocaleString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+      const stampText = `✓ DoneLog  •  ${formattedDate}`;
+
+      ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.textBaseline = 'middle';
+
+      const textMetrics = ctx.measureText(stampText);
+      const boxW = Math.min(width - margin * 2, Math.ceil(textMetrics.width) + padX * 2);
+      const boxH = fontSize + padY * 2;
+      const boxX = width - boxW - margin;
+      const boxY = height - boxH - margin;
+
+      // Subtle translucent dark pill with crisp border
+      ctx.save();
+      drawRoundedRect(ctx, boxX, boxY, boxW, boxH, Math.round(boxH * 0.35));
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.74)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = Math.max(1, Math.round(fontSize * 0.07));
+      ctx.stroke();
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(stampText, boxX + padX, boxY + boxH / 2 + 0.5, boxW - padX * 2);
+      ctx.restore();
+
+      // Optional top-left BEFORE / AFTER pill
+      if (tag) {
+        ctx.save();
+        const tagFont = Math.max(12, Math.round(fontSize * 0.85));
+        ctx.font = `800 ${tagFont}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+        const tagText = String(tag).toUpperCase();
+        const tagW = Math.ceil(ctx.measureText(tagText).width) + padX * 1.6;
+        const tagH = tagFont + padY * 1.6;
+        drawRoundedRect(ctx, margin, margin, tagW, tagH, Math.round(tagH * 0.35));
+        ctx.fillStyle = tagText === 'AFTER' || tagText === 'ПОСЛЕ'
+          ? 'rgba(13, 148, 136, 0.88)'
+          : 'rgba(15, 23, 42, 0.78)';
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tagText, margin + padX * 0.8, margin + tagH / 2 + 0.5);
+        ctx.restore();
+      }
+
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = cleanDataUrl;
   });
 }

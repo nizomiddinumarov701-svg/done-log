@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>DoneLog — Home Chore &amp; Proof Tracker</title>
-  <meta name="description" content="Log what you did, when you did it, and attach photo proof to show your brother — free PC &amp; Phone cloud sync via GitHub Gist." />
-  <meta name="theme-color" content="#0d9488" />
+  <meta name="description" content="Track home chore turns with your brother, log timestamps, attach Before &amp; After watermarked photo proof — free PC &amp; Phone cloud sync via GitHub Gist." />
+  <meta name="theme-color" content="#0d9488" id="themeColorMeta" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="DoneLog" />
@@ -28,46 +28,99 @@
             <h1 class="brand-title">DoneLog</h1>
             <span class="sync-pill" id="syncPill" title="Cloud sync status">Local mode</span>
           </div>
-          <p class="brand-subtitle">Track what you did &amp; when</p>
+          <p class="brand-subtitle" id="brandSubtitle">Track turns, chores &amp; photo proof</p>
         </div>
       </div>
 
       <div class="topbar-actions">
+        <button type="button" id="btnLangToggle" class="btn btn-ghost btn-compact" title="Switch language (EN / RU)">
+          🌐 <span id="langToggleLabel">EN</span>
+        </button>
+        <button type="button" id="btnThemeToggle" class="btn btn-ghost btn-icon-only" title="Toggle Dark / Light mode" aria-label="Toggle Dark or Light mode">
+          <span id="themeToggleIcon">🌙</span>
+        </button>
         <button type="button" id="btnSync" class="btn btn-primary" title="Free GitHub PC ↔ Phone Cloud Sync">
           <span>☁️</span>
           <span class="btn-label" id="btnSyncLabel">Sync</span>
         </button>
         <button type="button" id="btnShareBrother" class="btn btn-ghost hidden" title="Copy read-only link for your brother">
           <span>👁️</span>
-          <span class="btn-label">Share View</span>
+          <span class="btn-label" id="btnShareLabel">Share View</span>
         </button>
         <button type="button" id="btnCopySummary" class="btn btn-ghost" title="Copy a clean text summary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          <span class="btn-label">Copy List</span>
+          <span class="btn-label" id="btnCopyLabel">Copy List</span>
         </button>
         <button type="button" id="btnBackup" class="btn btn-ghost" title="Export or restore backup">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span class="btn-label">Backup</span>
+          <span class="btn-label" id="btnBackupLabel">Backup</span>
         </button>
       </div>
     </header>
 
+    <!-- Turn Tracker & Fairness Scoreboard -->
+    <section class="card scoreboard-card" aria-label="Turn tracker and fairness scoreboard">
+      <div class="scoreboard-top">
+        <div class="scoreboard-heading">
+          <h2 id="scoreboardTitle">🔄 Turn Tracker &amp; Fairness</h2>
+          <button type="button" id="btnEditNames" class="link-btn">✏️ Edit names</button>
+        </div>
+        <div class="period-pills" role="tablist" aria-label="Scoreboard timeframe">
+          <button type="button" class="period-pill" data-score-period="today" id="periodTodayBtn">Today</button>
+          <button type="button" class="period-pill active" data-score-period="week" id="periodWeekBtn">This Week</button>
+          <button type="button" class="period-pill" data-score-period="all" id="periodAllBtn">All Time</button>
+        </div>
+      </div>
+
+      <div class="fairness-grid">
+        <div class="player-score player-me">
+          <span class="player-tag"><span aria-hidden="true">🙋</span> <span id="scoreNameMe">Me</span></span>
+          <strong class="player-count" id="scoreCountMe">0</strong>
+        </div>
+
+        <div class="fairness-center">
+          <div class="fairness-verdict" id="fairnessVerdict">✨ Log a chore to start tracking turns</div>
+          <div class="fairness-bar" role="progressbar" aria-label="Turn balance">
+            <div class="fairness-fill-me" id="fairnessFillMe" style="width: 50%"></div>
+            <div class="fairness-fill-brother" id="fairnessFillBrother" style="width: 50%"></div>
+          </div>
+          <div class="fairness-pcts">
+            <span id="fairnessPctMe">50%</span>
+            <span id="fairnessPctBrother">50%</span>
+          </div>
+        </div>
+
+        <div class="player-score player-brother">
+          <span class="player-tag"><span aria-hidden="true">👦</span> <span id="scoreNameBrother">Brother</span></span>
+          <strong class="player-count" id="scoreCountBrother">0</strong>
+        </div>
+      </div>
+
+      <!-- Whose Turn Is Next Strip -->
+      <div class="turns-section">
+        <div class="turns-header">
+          <span class="turns-title" id="whoseTurnTitle">Whose Turn Is Next?</span>
+        </div>
+        <div id="turnsGrid" class="turns-grid"></div>
+      </div>
+    </section>
+
     <!-- Summary Stats Bar -->
     <section class="stats-grid" aria-label="Summary statistics">
       <div class="stat-card stat-highlight">
-        <span class="stat-label">Done Today</span>
+        <span class="stat-label" id="statTodayLabel">Done Today</span>
         <strong class="stat-value" id="statToday">0</strong>
       </div>
       <div class="stat-card">
-        <span class="stat-label">This Week</span>
+        <span class="stat-label" id="statWeekLabel">This Week</span>
         <strong class="stat-value" id="statWeek">0</strong>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Total Logged</span>
+        <span class="stat-label" id="statTotalLabel">Total Logged</span>
         <strong class="stat-value" id="statTotal">0</strong>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Photo Proofs</span>
+        <span class="stat-label" id="statPhotosLabel">Photo Proofs</span>
         <strong class="stat-value" id="statPhotos">0</strong>
       </div>
     </section>
@@ -75,13 +128,13 @@
     <!-- Main Two-Column Layout -->
     <main class="main-grid">
       <!-- Left Column: Brother Read-Only View Card OR Log Composer -->
-      <aside class="composer-panel">
+      <aside class="composer-panel" id="composerAnchor">
         <!-- Read-Only Share View Card (when opened with ?view=<gistId>) -->
         <div id="viewerCard" class="card locked-card hidden">
-          <div class="locked-badge">👁️ View-Only Proof Mode</div>
-          <h2>Verified Chore History</h2>
-          <p class="locked-desc">
-            You're viewing a live read-only chore log with timestamps and photo proofs. Tap any photo to inspect it full-screen.
+          <div class="locked-badge" id="viewerBadge">👁️ View-Only Proof Mode</div>
+          <h2 id="viewerTitle">Verified Chore History</h2>
+          <p class="locked-desc" id="viewerDesc">
+            You're viewing a live read-only chore log with timestamps, turn scoreboard, and photo proofs. Tap any photo to inspect it full-screen.
           </p>
           <button type="button" id="btnRefreshView" class="btn btn-primary btn-full">
             🔄 Refresh Latest
@@ -94,14 +147,27 @@
         <!-- Composer Card (Owner Mode) -->
         <div id="composerCard" class="card composer-card">
           <div class="card-header">
-            <h2>Log What You Did</h2>
+            <h2 id="logHeading">Log What Was Done</h2>
             <span class="live-clock" id="liveClock">Now</span>
+          </div>
+
+          <!-- Who Did It Segmented Selector -->
+          <div class="field who-field">
+            <span class="field-label" id="whoDidItLabel">Who did this?</span>
+            <div class="who-toggle" role="radiogroup" aria-label="Who completed this chore">
+              <button type="button" class="who-btn active" data-done-by="me" aria-checked="true" role="radio">
+                <span>🙋</span> <span id="whoMeLabel">Me</span>
+              </button>
+              <button type="button" class="who-btn" data-done-by="brother" aria-checked="false" role="radio">
+                <span>👦</span> <span id="whoBrotherLabel">Brother</span>
+              </button>
+            </div>
           </div>
 
           <!-- Quick-Pick Presets -->
           <div class="presets-section">
             <div class="presets-header">
-              <span class="field-label">Quick pick</span>
+              <span class="field-label" id="quickPickLabel">Quick pick</span>
               <button type="button" id="btnManagePresets" class="link-btn">Edit list</button>
             </div>
             <div class="presets-chips" id="presetChips" role="list"></div>
@@ -109,7 +175,7 @@
 
           <form id="logForm" class="log-form" novalidate>
             <div class="field">
-              <label for="taskInput" class="field-label">Task / Chore <span class="required">*</span></label>
+              <label for="taskInput" class="field-label"><span id="taskLabelText">Task / Chore</span> <span class="required">*</span></label>
               <input
                 type="text"
                 id="taskInput"
@@ -122,7 +188,7 @@
             </div>
 
             <div class="field">
-              <label for="noteInput" class="field-label">Details / Note <span class="optional">(optional)</span></label>
+              <label for="noteInput" class="field-label"><span id="noteLabelText">Details / Note</span> <span class="optional" id="noteOptionalText">(optional)</span></label>
               <textarea
                 id="noteInput"
                 class="input textarea"
@@ -135,10 +201,10 @@
             <!-- Timestamp Row -->
             <div class="field">
               <div class="time-row">
-                <span class="field-label">When did you do it?</span>
+                <span class="field-label" id="whenLabelText">When was it done?</span>
                 <label class="toggle-inline">
                   <input type="checkbox" id="customTimeToggle" />
-                  <span>Set custom time</span>
+                  <span id="customTimeLabel">Set custom time</span>
                 </label>
               </div>
               <div id="customTimeWrap" class="custom-time-wrap hidden">
@@ -147,24 +213,50 @@
               <p id="autoTimeHint" class="field-hint">Automatically saves the exact current date &amp; time.</p>
             </div>
 
-            <!-- Photo Proof Upload -->
+            <!-- Before & After Photo Proof Upload -->
             <div class="field">
-              <span class="field-label">Photo Proof <span class="optional">(optional)</span></span>
-              <div id="photoDropzone" class="photo-dropzone" tabindex="0" role="button" aria-label="Add photo proof">
-                <input type="file" id="photoInput" accept="image/*" hidden />
-                <div class="dropzone-empty" id="dropzoneEmpty">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  <span class="dropzone-title">Add a photo as proof</span>
-                  <span class="dropzone-sub">Tap to take a photo, choose from gallery, or drop here</span>
+              <span class="field-label"><span id="photosLabelText">Photo Proof</span> <span class="optional" id="photosOptionalText">(optional)</span></span>
+              <div class="photo-slots">
+                <!-- Before Slot -->
+                <div class="photo-slot-col">
+                  <span class="photo-slot-caption" id="beforeSlotLabel">Before (optional)</span>
+                  <div id="beforeDropzone" class="photo-dropzone photo-dropzone-compact" tabindex="0" role="button" aria-label="Add Before photo">
+                    <input type="file" id="beforePhotoInput" accept="image/*" hidden />
+                    <div class="dropzone-empty" id="beforeEmpty">
+                      <span class="dropzone-emoji" aria-hidden="true">📷</span>
+                      <span class="dropzone-sub" id="beforeTapHint">Tap or drop photo</span>
+                    </div>
+                    <div class="dropzone-preview hidden" id="beforePreview">
+                      <img id="beforePreviewImg" alt="Before proof preview" />
+                      <button type="button" id="btnRemoveBefore" class="btn-icon-remove" aria-label="Remove before photo" title="Remove">×</button>
+                    </div>
+                  </div>
                 </div>
-                <div class="dropzone-preview hidden" id="dropzonePreview">
-                  <img id="photoPreviewImg" alt="Selected proof preview" />
-                  <button type="button" id="btnRemovePhoto" class="btn-icon-remove" aria-label="Remove photo" title="Remove photo">×</button>
+
+                <!-- After / Proof Slot -->
+                <div class="photo-slot-col">
+                  <span class="photo-slot-caption photo-slot-accent" id="afterSlotLabel">After / Proof</span>
+                  <div id="afterDropzone" class="photo-dropzone photo-dropzone-compact" tabindex="0" role="button" aria-label="Add After or proof photo">
+                    <input type="file" id="afterPhotoInput" accept="image/*" hidden />
+                    <div class="dropzone-empty" id="afterEmpty">
+                      <span class="dropzone-emoji" aria-hidden="true">✨</span>
+                      <span class="dropzone-sub" id="afterTapHint">Tap or drop photo</span>
+                    </div>
+                    <div class="dropzone-preview hidden" id="afterPreview">
+                      <img id="afterPreviewImg" alt="After proof preview" />
+                      <button type="button" id="btnRemoveAfter" class="btn-icon-remove" aria-label="Remove proof photo" title="Remove">×</button>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              <label class="toggle-inline stamp-toggle">
+                <input type="checkbox" id="stampPhotoToggle" checked />
+                <span id="stampToggleLabel">🕒 Stamp date &amp; time watermark on photos</span>
+              </label>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-full" id="btnSubmitLog">
+            <button type="submit" class="btn btn-primary btn-full btn-lg" id="btnSubmitLog">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               <span id="btnSubmitLabel">Mark as Done</span>
             </button>
@@ -175,21 +267,29 @@
       <!-- Right Column: Timeline / History -->
       <section class="history-panel" aria-label="Completed tasks history">
         <div class="history-controls card">
-          <div class="filter-tabs" role="tablist" aria-label="Filter by date">
-            <button type="button" class="filter-tab active" data-range="all" role="tab" aria-selected="true">All</button>
-            <button type="button" class="filter-tab" data-range="today" role="tab" aria-selected="false">Today</button>
-            <button type="button" class="filter-tab" data-range="week" role="tab" aria-selected="false">This Week</button>
-            <button type="button" class="filter-tab" data-range="month" role="tab" aria-selected="false">This Month</button>
+          <div class="filter-bar-row">
+            <div class="filter-tabs" role="tablist" aria-label="Filter by date">
+              <button type="button" class="filter-tab active" data-range="all" id="tabAll" role="tab" aria-selected="true">All</button>
+              <button type="button" class="filter-tab" data-range="today" id="tabToday" role="tab" aria-selected="false">Today</button>
+              <button type="button" class="filter-tab" data-range="week" id="tabWeek" role="tab" aria-selected="false">This Week</button>
+              <button type="button" class="filter-tab" data-range="month" id="tabMonth" role="tab" aria-selected="false">This Month</button>
+            </div>
+
+            <div class="who-filter-tabs" role="tablist" aria-label="Filter by person">
+              <button type="button" class="who-filter-tab active" data-who="all" id="whoFilterAll">Everyone</button>
+              <button type="button" class="who-filter-tab" data-who="me" id="whoFilterMe">🙋 Me</button>
+              <button type="button" class="who-filter-tab" data-who="brother" id="whoFilterBrother">👦 Brother</button>
+            </div>
           </div>
 
           <div class="search-row">
             <div class="search-box">
               <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="search" id="searchInput" class="input search-input" placeholder="Search what you did..." />
+              <input type="search" id="searchInput" class="input search-input" placeholder="Search chores or notes..." />
             </div>
             <label class="photo-filter-pill">
               <input type="checkbox" id="photoOnlyToggle" />
-              <span>📷 With photo</span>
+              <span id="withPhotoLabel">📷 With photo</span>
             </label>
           </div>
         </div>
@@ -197,8 +297,8 @@
         <!-- Loading State -->
         <div id="loadingState" class="empty-state card hidden">
           <div class="spinner" aria-hidden="true"></div>
-          <h3>Loading chore log...</h3>
-          <p>Fetching saved chores and photo proofs from GitHub Gist.</p>
+          <h3 id="loadingTitle">Loading chore log...</h3>
+          <p id="loadingDesc">Fetching saved chores and photo proofs from GitHub Gist.</p>
         </div>
 
         <!-- Timeline Feed -->
@@ -212,6 +312,37 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- Mobile Quick-Log Floating Action Button -->
+  <button type="button" id="mobileFab" class="mobile-fab hidden" aria-label="Jump to log a chore">
+    <span id="mobileFabLabel">+ Log Chore</span>
+  </button>
+
+  <!-- Edit Member Names Modal -->
+  <div id="namesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="namesModalTitle">
+    <div class="modal-backdrop" data-close-modal="namesModal"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="namesModalTitle">Turn Tracker Names</h3>
+        <button type="button" class="modal-close" data-close-modal="namesModal" aria-label="Close">×</button>
+      </div>
+      <p class="modal-desc" id="namesModalDesc">Customize the names shown on the Turn Tracker &amp; Fairness Scoreboard.</p>
+      <form id="namesForm" class="log-form">
+        <div class="field">
+          <label for="myNameInput" class="field-label" id="myNameLabel">Your Name</label>
+          <input type="text" id="myNameInput" class="input" maxlength="24" placeholder="Me" />
+        </div>
+        <div class="field">
+          <label for="brotherNameInput" class="field-label" id="brotherNameLabel">Brother's Name</label>
+          <input type="text" id="brotherNameInput" class="input" maxlength="24" placeholder="Brother" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal="namesModal" id="btnCancelNames">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btnSaveNames">Save Changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- GitHub Gist Cloud Sync Modal -->
@@ -243,10 +374,10 @@
         <p id="syncConnectedError" class="form-error hidden" role="alert"></p>
 
         <div class="sync-instructions">
-          <strong>To connect your phone:</strong>
-          <p>Open this same DoneLog link on your phone, tap <strong>☁️ Sync</strong>, and paste your <strong>same GitHub Sync Token</strong> — your private vault and photos sync automatically!</p>
-          <strong>To show your brother (read-only):</strong>
-          <p>Tap <strong>👁️ Copy Brother's View Link</strong> above and send it to him. He can see all chores, times, and photo proofs without logging in — and cannot edit or delete anything.</p>
+          <strong id="syncPhoneHeading">To connect your phone:</strong>
+          <p id="syncPhoneBody">Open this same DoneLog link on your phone, tap ☁️ Sync, and paste your same GitHub Sync Token — your private vault and photos sync automatically!</p>
+          <strong id="syncBrotherHeading">To show your brother (read-only):</strong>
+          <p id="syncBrotherBody">Tap 👁️ Copy Brother's View Link above and send it to him. He can see all chores, turns, timestamps, and photo proofs without logging in — and cannot edit or delete anything.</p>
         </div>
 
         <div class="modal-actions modal-actions-split">
@@ -257,26 +388,26 @@
 
       <!-- Setup View -->
       <div id="syncSetupPanel" class="sync-panel">
-        <p class="modal-desc">
-          Sync your chores, timestamps, presets, and photo proofs across PC and phone using a <strong>private GitHub Gist</strong> — 100% free forever with zero credit limits!
+        <p class="modal-desc" id="syncSetupDesc">
+          Sync your chores, turns, timestamps, presets, and Before/After photo proofs across PC and phone using a private GitHub Gist — 100% free forever!
         </p>
 
         <div class="sync-steps">
           <div class="sync-step">
             <span class="sync-step-num">1</span>
             <div class="sync-step-body">
-              <div><strong>Use your existing LifeQuest <code>gist</code> token</strong> or create a free GitHub Sync Token (only checks <code>gist</code>):</div>
+              <div id="syncStep1Title">Use your existing LifeQuest <code>gist</code> token or create a free GitHub Sync Token (only checks <code>gist</code>):</div>
               <a id="createTokenLink" class="btn btn-secondary btn-sm sync-token-link-btn" href="https://github.com/settings/tokens/new?scopes=gist&description=DoneLog+Sync" target="_blank" rel="noopener noreferrer">
                 🔑 Create GitHub Token ↗
               </a>
-              <span class="sync-step-hint">Set Expiration to <strong>No expiration</strong> (or 1 year), click <strong>Generate token</strong>, and copy the <code>ghp_...</code> code. DoneLog creates its own separate vault file so it never affects LifeQuest.</span>
+              <span class="sync-step-hint" id="syncStep1Hint">Set Expiration to No expiration (or 1 year), click Generate token, and copy the ghp_... code. DoneLog creates its own separate vault file so it never affects LifeQuest.</span>
             </div>
           </div>
           <div class="sync-step">
             <span class="sync-step-num">2</span>
             <div class="sync-step-body">
-              <strong>Paste it below on PC &amp; Phone</strong>
-              <span class="sync-step-hint">First device creates your private vault; your second device auto-finds and syncs everything with the same token!</span>
+              <strong id="syncStep2Title">Paste it below on PC &amp; Phone</strong>
+              <span class="sync-step-hint" id="syncStep2Hint">First device creates your private vault; your second device auto-finds and syncs everything with the same token!</span>
             </div>
           </div>
         </div>
@@ -285,7 +416,7 @@
 
         <form id="syncConnectForm" class="log-form">
           <div class="field">
-            <label for="syncTokenInput" class="field-label">GitHub Sync Token <span class="optional">(<code>gist</code> scope)</span></label>
+            <label for="syncTokenInput" class="field-label"><span id="tokenLabelText">GitHub Sync Token</span> <span class="optional" id="tokenScopeHint">(gist scope)</span></label>
             <input
               type="password"
               id="syncTokenInput"
@@ -299,10 +430,10 @@
             />
           </div>
 
-          <p class="field-hint">🔒 Stored only inside this browser and talks directly to GitHub's official API.</p>
+          <p class="field-hint" id="tokenPrivacyHint">🔒 Stored only inside this browser and talks directly to GitHub's official API.</p>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-ghost" data-close-modal="syncModal">Cancel</button>
+            <button type="button" class="btn btn-ghost" data-close-modal="syncModal" id="btnCancelSync">Cancel</button>
             <button type="submit" class="btn btn-primary" id="btnSyncConnect">☁️ Connect &amp; Sync Now</button>
           </div>
         </form>
@@ -310,11 +441,15 @@
     </div>
   </div>
 
-  <!-- Photo Proof Lightbox Modal -->
+  <!-- Photo Proof Lightbox Modal (with Before / After switcher) -->
   <div id="lightboxModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
     <div class="modal-backdrop" data-close-modal="lightboxModal"></div>
     <div class="lightbox-content">
       <button type="button" class="lightbox-close" data-close-modal="lightboxModal" aria-label="Close photo">×</button>
+      <div id="lightboxTabs" class="lightbox-tabs hidden">
+        <button type="button" class="lightbox-tab" id="lightboxTabBefore" data-lb-slot="before">Before</button>
+        <button type="button" class="lightbox-tab active" id="lightboxTabAfter" data-lb-slot="after">After</button>
+      </div>
       <img id="lightboxImg" src="" alt="Task proof photo" />
       <div class="lightbox-caption">
         <div>
@@ -336,19 +471,30 @@
       <form id="editForm" class="log-form">
         <input type="hidden" id="editId" />
         <div class="field">
-          <label for="editTaskInput" class="field-label">Task / Chore</label>
+          <span class="field-label" id="editWhoLabel">Who did this?</span>
+          <div class="who-toggle" role="radiogroup">
+            <button type="button" class="who-btn active" data-edit-done-by="me" role="radio" aria-checked="true">
+              <span>🙋</span> <span id="editWhoMeLabel">Me</span>
+            </button>
+            <button type="button" class="who-btn" data-edit-done-by="brother" role="radio" aria-checked="false">
+              <span>👦</span> <span id="editWhoBrotherLabel">Brother</span>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="editTaskInput" class="field-label" id="editTaskLabel">Task / Chore</label>
           <input type="text" id="editTaskInput" class="input" maxlength="120" required />
         </div>
         <div class="field">
-          <label for="editNoteInput" class="field-label">Details / Note</label>
+          <label for="editNoteInput" class="field-label" id="editNoteLabel">Details / Note</label>
           <textarea id="editNoteInput" class="input textarea" rows="2" maxlength="300"></textarea>
         </div>
         <div class="field">
-          <label for="editTimeInput" class="field-label">Date &amp; Time</label>
+          <label for="editTimeInput" class="field-label" id="editTimeLabel">Date &amp; Time</label>
           <input type="datetime-local" id="editTimeInput" class="input" required />
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn btn-ghost" data-close-modal="editModal">Cancel</button>
+          <button type="button" class="btn btn-ghost" data-close-modal="editModal" id="btnCancelEdit">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnSaveEdit">Save Changes</button>
         </div>
       </form>
@@ -366,12 +512,12 @@
       <form id="addPresetForm" class="preset-add-row">
         <input type="text" id="newPresetIcon" class="input icon-input" value="✅" maxlength="4" aria-label="Emoji icon" />
         <input type="text" id="newPresetLabel" class="input" placeholder="Add new chore (e.g., Watered plants)" maxlength="50" required />
-        <button type="submit" class="btn btn-primary">Add</button>
+        <button type="submit" class="btn btn-primary" id="btnAddPreset">Add</button>
       </form>
       <ul id="presetManageList" class="preset-manage-list"></ul>
       <div class="modal-actions">
         <button type="button" id="btnResetPresets" class="btn btn-ghost">Reset defaults</button>
-        <button type="button" class="btn btn-primary" data-close-modal="presetsModal">Done</button>
+        <button type="button" class="btn btn-primary" data-close-modal="presetsModal" id="btnPresetsDone">Done</button>
       </div>
     </div>
   </div>
@@ -384,11 +530,11 @@
         <h3 id="backupModalTitle">Backup &amp; Restore</h3>
         <button type="button" class="modal-close" data-close-modal="backupModal" aria-label="Close">×</button>
       </div>
-      <p class="modal-desc">Download a full JSON backup of all your chores and photo proofs, or restore one anytime.</p>
+      <p class="modal-desc" id="backupModalDesc">Download a full JSON backup of all your chores, turns, and photo proofs, or restore one anytime.</p>
       <div class="backup-actions">
         <button type="button" id="btnExportJson" class="btn btn-primary btn-full">Download Backup (.json)</button>
         <label id="restoreBackupLabel" class="btn btn-secondary btn-full file-btn">
-          <span>Restore from Backup (.json)</span>
+          <span id="restoreBackupText">Restore from Backup (.json)</span>
           <input type="file" id="importJsonInput" accept="application/json,.json" hidden />
         </label>
       </div>

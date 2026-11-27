@@ -1,13 +1,12 @@
-# DoneLog — Home Chore & Proof Tracker
+# DoneLog — Home Chore, Turn Tracker & Proof App
 
-A clean, mobile-friendly web app hosted 100% free on **GitHub Pages** with **free GitHub Gist PC ↔ Phone Cloud Sync** — log what you did, when you did it, attach photo proofs, and share a read-only link with your brother.
+A clean, mobile-friendly web app hosted 100% free on **GitHub Pages** with **free GitHub Gist PC ↔ Phone Cloud Sync** — track whose turn is next with your brother, attach **Before & After** photos with automatic timestamp watermarks, switch between Dark/Light themes and EN/RU, and share a live read-only proof link.
 
 ## Features
-- **100% Free Forever on GitHub Pages**: Zero hosting costs or credit limits; works seamlessly on PC and phone (installable to your phone's home screen via PWA manifest).
-- **Free GitHub Gist PC ↔ Phone Cloud Sync**: Syncs all chores, timestamps, notes, quick-pick presets, and compressed photo proofs across devices using a private GitHub Gist (`donelog-sync-vault.json` + per-photo files). You can even reuse your existing `gist` token!
-- **Read-Only Share Link for Your Brother**: Copy a `?view=<gistId>` link so your brother can open your live chore history and photo proofs on his phone without signing in — and without being able to edit or delete anything.
-- **Quick-Pick Chores**: Tap common chores (including *Cleaned bedroom*, *Washed dishes*, *Took out trash*, etc.) or customize your own list.
-- **Offline-Ready Local Cache**: Saves immediately to IndexedDB and merges cleanly across devices when syncing.
+- **🔄 Turn Tracker & Fairness Scoreboard**: Log chores for yourself or your brother (with customizable names), view the live head-to-head split bar (*Today / This Week / All Time*), and see a **Whose Turn Is Next?** strip with 1-tap logging.
+- **📸 Before & After Photos + Automatic Timestamp Watermark**: Attach a single proof photo or a side-by-side **Before → After** pair, automatically stamped with the exact date & time so proof is always verifiable, with a dual Before/After full-screen lightbox.
+- **🌙 Dark Mode, Mobile Polish & EN / RU Switch**: 1-tap Dark/Light theme, English / Russian UI switching, mobile quick-log floating button, and PWA Home Screen installability.
+- **☁️ Free GitHub Gist PC ↔ Phone Cloud Sync**: Syncs all chores, turns, names, presets, and photos across devices using a private GitHub Gist — plus a 1-click **👁️ Share View** read-only link (`?view=<gistId>`) for your brother.
 
 ## Local Preview
 ```bash
